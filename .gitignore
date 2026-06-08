@@ -1,0 +1,35 @@
+# 后端
+backend/node_modules/
+backend/.env
+backend/prisma/dev.db
+backend/prisma/dev.db-journal
+backend/prisma/migrations/dev.db*
+
+# 前端 Flutter
+frontend/.dart_tool/
+frontend/.flutter-plugins
+frontend/.flutter-plugins-dependencies
+frontend/build/
+frontend/build_uni/
+frontend/.packages
+frontend/pubspec.lock
+frontend/dist/
+frontend/build_log*.txt
+
+# Android 构建产物
+**/.gradle/
+**/local.properties
+*.apk
+*.aab
+*.keystore
+*.jks
+
+# FCM 推送密钥（含私钥，切勿提交）
+backend/firebase-service-account.json
+frontend/android/app/google-services.json
+frontend/ios/Runner/GoogleService-Info.plist
+frontend/lib/firebase_options.dart
+
+# 通用
+.DS_Store
+*.log
