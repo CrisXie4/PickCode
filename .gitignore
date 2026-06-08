@@ -15,9 +15,12 @@ frontend/.packages
 frontend/pubspec.lock
 frontend/dist/
 frontend/build_log*.txt
+frontend/env.json
 
 # Android 构建产物
+**/build/
 **/.gradle/
+**/.cxx/
 **/local.properties
 *.apk
 *.aab

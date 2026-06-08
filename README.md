@@ -62,9 +62,19 @@ npm run dev                   # 启动：http://localhost:3000
 ```bash
 cd frontend
 flutter pub get
-flutter run                   # 连真机/模拟器运行
+
+# 1) 配置自己的服务器地址（不要改源码、不要提交真实地址）
+cp env.example.json env.json
+#    编辑 env.json：
+#    - API_BASE_URL：你的后端地址，如 https://your-domain/api（本地模拟器用 http://10.0.2.2:3000/api）
+#    - UPDATE_REPO ：你 fork 的 GitHub 仓库 owner/repo（用于"检查更新"；留空则关闭更新检查）
+
+# 2) 运行 / 打包时注入配置
+flutter run         --dart-define-from-file=env.json
+flutter build apk --release --dart-define-from-file=env.json
 ```
-> Android 模拟器访问本机后端用 `10.0.2.2`；真机改 `lib/services/api_client.dart` 里的 `baseUrl` 为电脑局域网 IP。
+> **隐私/自部署说明**：服务器地址与更新仓库**不写死在源码里**，而是构建时由 `env.json` 注入（`env.json` 已被 git 忽略）。
+> 所以：① 仓库里只有占位符，不会泄露任何人的服务器；② 自己部署时填你自己的地址和仓库，**别人推送的版本不会覆盖你的用户**。
 
 ---
 
