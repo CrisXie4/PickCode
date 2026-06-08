@@ -1,0 +1,140 @@
+// Prisma schema —— 快递取件协作 App
+// 默认 SQLite（开箱即用）。切 PostgreSQL：provider 改 "postgresql" 即可，模型无需改动。
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ============ 用户 ============
+model User {
+  id           String   @id @default(cuid())
+  phone        String?  @unique
+  email        String?  @unique
+  passwordHash String
+  nickname     String
+  avatarUrl    String?
+  isAdmin      Boolean  @default(false) // 管理后台权限
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  parcels        Parcel[]
+  ownedGroups    Group[]        @relation("GroupOwner")
+  memberships    GroupMember[]
+  joinRequests   JoinRequest[]
+  sharedParcels  SharedParcel[] @relation("SharedBy")
+  notifications  Notification[]
+  deviceTokens   DeviceToken[]
+}
+
+// ============ 设备推送 token（FCM / APNs）============
+model DeviceToken {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String   @unique // 客户端注册的推送 token
+  platform  String   @default("android") // ios / android
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+// ============ 快递（个人私有） ============
+model Parcel {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  company    String? // 快递公司：顺丰/中通/京东...
+  pickupCode String // 取件码
+  locker     String? // 取件柜编号，如 12-3-08
+  location   String? // 小区/驿站/柜机位置
+  recipient  String? // 收件人
+  note       String? // 备注
+  status     String   @default("pending") // pending 待取件 / picked 已取件 / expired 已过期
+  source     String   @default("manual") // manual 手动 / sms / clipboard / ocr
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  shares SharedParcel[]
+
+  @@index([userId])
+}
+
+// ============ 群组 ============
+model Group {
+  id         String   @id @default(cuid())
+  name       String
+  ownerId    String
+  owner      User     @relation("GroupOwner", fields: [ownerId], references: [id])
+  inviteCode String   @unique // 邀请码
+  createdAt  DateTime @default(now())
+
+  members       GroupMember[]
+  joinRequests  JoinRequest[]
+  sharedParcels SharedParcel[]
+}
+
+// ============ 群成员 ============
+model GroupMember {
+  id            String   @id @default(cuid())
+  groupId       String
+  group         Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role          String   @default("member") // owner / member
+  notifyEnabled Boolean  @default(true) // 群通知开关
+  joinedAt      DateTime @default(now())
+
+  @@unique([groupId, userId])
+  @@index([userId])
+}
+
+// ============ 加群申请 ============
+model JoinRequest {
+  id        String   @id @default(cuid())
+  groupId   String
+  group     Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status    String   @default("pending") // pending / approved / rejected
+  message   String? // 申请留言
+  createdAt DateTime @default(now())
+
+  @@unique([groupId, userId])
+}
+
+// ============ 群内共享的快递 ============
+model SharedParcel {
+  id         String   @id @default(cuid())
+  parcelId   String
+  parcel     Parcel   @relation(fields: [parcelId], references: [id], onDelete: Cascade)
+  groupId    String
+  group      Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  sharedById String
+  sharedBy   User     @relation("SharedBy", fields: [sharedById], references: [id])
+  note       String? // 共享备注，如“帮我顺手拿一下”
+  status     String   @default("pending") // pending / picked / expired
+  createdAt  DateTime @default(now())
+
+  @@unique([parcelId, groupId])
+  @@index([groupId])
+}
+
+// ============ 通知 ============
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String // new_parcel / group_share / join_request / join_result / admin_remind
+  title     String
+  body      String?
+  data      String? // JSON 字符串，存额外跳转信息
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([userId, read])
+}
