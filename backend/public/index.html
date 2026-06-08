@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>快递取件 · 管理后台</title>
+  <style>
+    * { box-sizing: border-box; font-family: -apple-system, "Microsoft YaHei", sans-serif; }
+    body { margin: 0; background: #f4f6fb; color: #222; }
+    header { background: #3a7afe; color: #fff; padding: 16px 24px; font-size: 18px; font-weight: bold; display: flex; justify-content: space-between; align-items: center; }
+    header .logout { font-size: 13px; font-weight: normal; background: rgba(255,255,255,.2); padding: 6px 12px; border-radius: 8px; cursor: pointer; }
+    .wrap { max-width: 1100px; margin: 24px auto; padding: 0 16px; }
+    .card { background: #fff; border-radius: 12px; padding: 20px; margin-bottom: 16px; box-shadow: 0 2px 8px rgba(0,0,0,.05); }
+    input, button, select { padding: 9px 12px; border-radius: 8px; border: 1px solid #ddd; font-size: 14px; }
+    button { background: #3a7afe; color: #fff; border: none; cursor: pointer; }
+    button.warn { background: #ff6b35; }
+    button.danger { background: #e53935; }
+    button.ghost { background: #eef2ff; color: #3a7afe; }
+    button.sm { padding: 5px 10px; font-size: 13px; }
+    button:hover { opacity: .9; }
+    .stats { display: flex; gap: 16px; flex-wrap: wrap; }
+    .stat { flex: 1; min-width: 120px; text-align: center; padding: 16px; background: #f0f4ff; border-radius: 10px; }
+    .stat b { font-size: 28px; color: #3a7afe; display: block; }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    th, td { text-align: left; padding: 10px; border-bottom: 1px solid #eee; vertical-align: middle; }
+    th { background: #fafafa; }
+    .tag { padding: 2px 8px; border-radius: 6px; font-size: 12px; }
+    .pending { background: #fff3e0; color: #e65100; }
+    .picked { background: #e8f5e9; color: #2e7d32; }
+    .expired { background: #eee; color: #777; }
+    .badge { background: #e3f2fd; color: #1565c0; padding: 2px 7px; border-radius: 6px; font-size: 12px; }
+    .badge.admin { background: #fff3e0; color: #e65100; }
+    .hidden { display: none; }
+    .tabs { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+    .tabs button { background: #fff; color: #555; border: 1px solid #e0e0e0; }
+    .tabs button.active { background: #3a7afe; color: #fff; border-color: #3a7afe; }
+    .toolbar { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; align-items: center; }
+    .pager { display: flex; gap: 8px; align-items: center; margin-top: 14px; justify-content: flex-end; font-size: 14px; color: #666; }
+    .actions { display: flex; gap: 6px; flex-wrap: wrap; }
+    .muted { color: #999; }
+    .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: #323232; color: #fff; padding: 12px 20px; border-radius: 8px; opacity: 0; transition: opacity .25s; pointer-events: none; z-index: 99; }
+    .toast.show { opacity: 1; }
+    h3 { margin-top: 0; }
+  </style>
+</head>
+<body>
+  <header>
+    <span>📦 快递取件协作 · 管理后台</span>
+    <span class="logout hidden" id="logoutBtn" onclick="logout()">退出登录</span>
+  </header>
+  <div class="wrap">
+    <!-- 登录 -->
+    <div class="card" id="loginCard">
+      <h3>管理员登录</h3>
+      <input id="account" placeholder="邮箱 / 手机号" value="admin@express.local" />
+      <input id="password" type="password" placeholder="密码" value="admin123456" />
+      <button onclick="login()">登录</button>
+      <span id="loginMsg" style="color:#e53935;margin-left:10px;"></span>
+    </div>
+
+    <!-- 控制台 -->
+    <div id="dash" class="hidden">
+      <div class="tabs">
+        <button data-tab="overview" class="active" onclick="switchTab('overview')">📊 概览</button>
+        <button data-tab="users" onclick="switchTab('users')">👤 用户</button>
+        <button data-tab="groups" onclick="switchTab('groups')">👥 群组</button>
+        <button data-tab="parcels" onclick="switchTab('parcels')">📦 快递</button>
+      </div>
+
+      <!-- 概览 -->
+      <div id="tab-overview">
+        <div class="card"><div class="stats" id="stats"></div></div>
+        <div class="card">
+          <h3>一键提醒所有待取件用户</h3>
+          <input id="remindBody" placeholder="提醒内容（可空）" style="width:300px" />
+          <button class="warn" onclick="remindAll()">🔔 一键提醒</button>
+          <span id="remindMsg" style="margin-left:10px;color:#2e7d32;"></span>
+        </div>
+        <div class="card">
+          <h3>📢 广播通知（推给全部用户）</h3>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+            <input id="bcTitle" placeholder="标题（必填）" style="width:200px" />
+            <input id="bcBody" placeholder="内容（可空）" style="width:300px" />
+            <button onclick="broadcast()">发送广播</button>
+            <span id="bcMsg" style="margin-left:6px;color:#2e7d32;"></span>
+          </div>
+          <p style="color:#888;font-size:12px;margin:8px 0 0;">所有用户都会收到。App 端轮询/前台服务即可弹出通知。</p>
+        </div>
+      </div>
+
+      <!-- 用户 -->
+      <div id="tab-users" class="hidden">
+        <div class="card">
+          <h3>用户管理</h3>
+          <div class="toolbar">
+            <input id="userQ" placeholder="搜索昵称 / 手机 / 邮箱" style="width:240px" onkeydown="if(event.key==='Enter')loadUsers(1)" />
+            <button onclick="loadUsers(1)">搜索</button>
+          </div>
+          <table>
+            <thead><tr><th>昵称</th><th>手机 / 邮箱</th><th>角色</th><th>快递</th><th>群组</th><th>注册时间</th><th>操作</th></tr></thead>
+            <tbody id="userRows"></tbody>
+          </table>
+          <div class="pager" id="userPager"></div>
+        </div>
+      </div>
+
+      <!-- 群组 -->
+      <div id="tab-groups" class="hidden">
+        <div class="card">
+          <h3>群组管理</h3>
+          <div class="toolbar">
+            <input id="groupQ" placeholder="搜索群名 / 邀请码" style="width:240px" onkeydown="if(event.key==='Enter')loadGroups(1)" />
+            <button onclick="loadGroups(1)">搜索</button>
+          </div>
+          <table>
+            <thead><tr><th>群名</th><th>邀请码</th><th>群主</th><th>成员</th><th>共享</th><th>创建时间</th><th>操作</th></tr></thead>
+            <tbody id="groupRows"></tbody>
+          </table>
+          <div class="pager" id="groupPager"></div>
+        </div>
+        <div class="card hidden" id="groupDetail"></div>
+      </div>
+
+      <!-- 快递 -->
+      <div id="tab-parcels" class="hidden">
+        <div class="card">
+          <h3>快递管理</h3>
+          <div class="toolbar">
+            <input id="parcelQ" placeholder="搜索取件码 / 公司 / 位置" style="width:220px" onkeydown="if(event.key==='Enter')loadParcels(1)" />
+            <select id="parcelStatus" onchange="loadParcels(1)">
+              <option value="">全部状态</option>
+              <option value="pending">待取件</option>
+              <option value="picked">已取件</option>
+              <option value="expired">已过期</option>
+            </select>
+            <button onclick="loadParcels(1)">搜索</button>
+          </div>
+          <table>
+            <thead><tr><th>取件码</th><th>公司</th><th>位置</th><th>状态</th><th>用户</th><th>创建时间</th><th>操作</th></tr></thead>
+            <tbody id="parcelRows"></tbody>
+          </table>
+          <div class="pager" id="parcelPager"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    const API = '/api';
+    let token = localStorage.getItem('admin_token');
+    let meId = null;
+    const STATUS_LABEL = { pending: '待取件', picked: '已取件', expired: '已过期' };
+    const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    const fmt = (d) => new Date(d).toLocaleString();
+
+    function toast(msg) {
+      const t = document.getElementById('toast');
+      t.textContent = msg; t.classList.add('show');
+      setTimeout(() => t.classList.remove('show'), 2000);
+    }
+
+    async function api(path, opts = {}) {
+      const res = await fetch(API + path, {
+        ...opts,
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token, ...(opts.headers || {}) },
+      });
+      if (res.status === 401) { logout(); throw new Error('登录已过期，请重新登录'); }
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).message || ('HTTP ' + res.status));
+      return res.json();
+    }
+
+    async function login() {
+      const account = document.getElementById('account').value;
+      const password = document.getElementById('password').value;
+      try {
+        const res = await fetch(API + '/auth/login', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ account, password }),
+        }).then(r => r.json());
+        if (!res.token) throw new Error(res.message || '账号或密码错误');
+        if (!res.user.isAdmin) throw new Error('非管理员账号');
+        token = res.token; meId = res.user.id;
+        localStorage.setItem('admin_token', token);
+        showDash();
+      } catch (e) {
+        document.getElementById('loginMsg').textContent = '登录失败: ' + e.message;
+      }
+    }
+
+    function logout() {
+      token = null; localStorage.removeItem('admin_token');
+      document.getElementById('dash').classList.add('hidden');
+      document.getElementById('logoutBtn').classList.add('hidden');
+      document.getElementById('loginCard').classList.remove('hidden');
+    }
+
+    function showDash() {
+      document.getElementById('loginCard').classList.add('hidden');
+      document.getElementById('dash').classList.remove('hidden');
+      document.getElementById('logoutBtn').classList.remove('hidden');
+      switchTab('overview');
+    }
+
+    function switchTab(name) {
+      document.querySelectorAll('.tabs button').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
+      ['overview', 'users', 'groups', 'parcels'].forEach(t =>
+        document.getElementById('tab-' + t).classList.toggle('hidden', t !== name));
+      if (name === 'overview') loadStats();
+      if (name === 'users') loadUsers(1);
+      if (name === 'groups') loadGroups(1);
+      if (name === 'parcels') loadParcels(1);
+    }
+
+    function pager(el, { page, pageSize, total }, fn) {
+      const pages = Math.max(1, Math.ceil(total / pageSize));
+      el.innerHTML = `共 ${total} 条 · 第 ${page}/${pages} 页
+        <button class="sm ghost" ${page <= 1 ? 'disabled' : ''} onclick="${fn}(${page - 1})">上一页</button>
+        <button class="sm ghost" ${page >= pages ? 'disabled' : ''} onclick="${fn}(${page + 1})">下一页</button>`;
+    }
+
+    // ===== 概览 =====
+    async function loadStats() {
+      const s = await api('/admin/stats');
+      document.getElementById('stats').innerHTML = `
+        <div class="stat"><b>${s.users}</b>用户</div>
+        <div class="stat"><b>${s.parcels}</b>快递总数</div>
+        <div class="stat"><b>${s.pendingParcels}</b>待取件</div>
+        <div class="stat"><b>${s.groups}</b>群组</div>`;
+    }
+    async function remindAll() {
+      const body = document.getElementById('remindBody').value;
+      const res = await api('/admin/remind-all', { method: 'POST', body: JSON.stringify({ body }) });
+      document.getElementById('remindMsg').textContent = `已提醒 ${res.notified} 位用户`;
+    }
+
+    async function broadcast() {
+      const title = document.getElementById('bcTitle').value.trim();
+      const body = document.getElementById('bcBody').value.trim();
+      const msg = document.getElementById('bcMsg');
+      if (!title) { msg.style.color = '#e53935'; msg.textContent = '请填写标题'; return; }
+      try {
+        const res = await api('/admin/broadcast', { method: 'POST', body: JSON.stringify({ title, body: body || null }) });
+        msg.style.color = '#2e7d32';
+        msg.textContent = `已推送给 ${res.notified} 位用户`;
+        document.getElementById('bcTitle').value = '';
+        document.getElementById('bcBody').value = '';
+      } catch (e) {
+        msg.style.color = '#e53935';
+        msg.textContent = '发送失败: ' + e.message;
+      }
+    }
+
+    // ===== 用户 =====
+    async function loadUsers(page = 1) {
+      const q = document.getElementById('userQ').value.trim();
+      const data = await api(`/admin/users?page=${page}&q=${encodeURIComponent(q)}`);
+      document.getElementById('userRows').innerHTML = data.users.map(u => `
+        <tr>
+          <td><b>${esc(u.nickname)}</b></td>
+          <td>${esc(u.phone || u.email || '-')}</td>
+          <td>${u.isAdmin ? '<span class="badge admin">管理员</span>' : '<span class="badge">普通</span>'}</td>
+          <td>${u._count.parcels}</td>
+          <td>${u._count.memberships}<small class="muted">${u._count.ownedGroups ? ' (主'+u._count.ownedGroups+')' : ''}</small></td>
+          <td><small>${fmt(u.createdAt)}</small></td>
+          <td><div class="actions">
+            <button class="sm ghost" onclick="toggleAdmin('${u.id}', ${!u.isAdmin})">${u.isAdmin ? '取消管理' : '设为管理'}</button>
+            <button class="sm ghost" onclick="resetPwd('${u.id}')">重置密码</button>
+            ${u.id === meId ? '' : `<button class="sm danger" onclick="delUser('${u.id}','${esc(u.nickname)}')">删除</button>`}
+          </div></td>
+        </tr>`).join('') || '<tr><td colspan="7" class="muted">无数据</td></tr>';
+      pager(document.getElementById('userPager'), data, 'loadUsers');
+    }
+    async function toggleAdmin(id, makeAdmin) {
+      try { await api('/admin/users/' + id, { method: 'PATCH', body: JSON.stringify({ isAdmin: makeAdmin }) });
+        toast('已更新'); loadUsers(currentPage('userPager')); } catch (e) { toast(e.message); }
+    }
+    async function resetPwd(id) {
+      const pwd = prompt('输入该用户的新密码（至少 6 位）');
+      if (!pwd) return;
+      if (pwd.length < 6) return toast('密码至少 6 位');
+      try { await api('/admin/users/' + id, { method: 'PATCH', body: JSON.stringify({ password: pwd }) });
+        toast('密码已重置'); } catch (e) { toast(e.message); }
+    }
+    async function delUser(id, name) {
+      if (!confirm(`确定删除用户「${name}」？\n其名下的群组、快递、群成员关系都会被一并删除，不可恢复！`)) return;
+      try { await api('/admin/users/' + id, { method: 'DELETE' }); toast('已删除'); loadUsers(1); } catch (e) { toast(e.message); }
+    }
+
+    // ===== 群组 =====
+    async function loadGroups(page = 1) {
+      const q = document.getElementById('groupQ').value.trim();
+      const data = await api(`/admin/groups?page=${page}&q=${encodeURIComponent(q)}`);
+      document.getElementById('groupRows').innerHTML = data.groups.map(g => `
+        <tr>
+          <td><b>${esc(g.name)}</b></td>
+          <td><code>${esc(g.inviteCode)}</code></td>
+          <td>${esc(g.owner?.nickname || '-')}</td>
+          <td>${g._count.members}</td>
+          <td>${g._count.sharedParcels}</td>
+          <td><small>${fmt(g.createdAt)}</small></td>
+          <td><div class="actions">
+            <button class="sm ghost" onclick="viewGroup('${g.id}')">详情</button>
+            <button class="sm danger" onclick="delGroup('${g.id}','${esc(g.name)}')">删除</button>
+          </div></td>
+        </tr>`).join('') || '<tr><td colspan="7" class="muted">无数据</td></tr>';
+      pager(document.getElementById('groupPager'), data, 'loadGroups');
+    }
+    async function viewGroup(id) {
+      const { group: g } = await api('/admin/groups/' + id);
+      const box = document.getElementById('groupDetail');
+      box.classList.remove('hidden');
+      box.innerHTML = `
+        <h3>「${esc(g.name)}」详情 <button class="sm ghost" style="float:right" onclick="document.getElementById('groupDetail').classList.add('hidden')">收起</button></h3>
+        <p class="muted">邀请码 <code>${esc(g.inviteCode)}</code> · 群主 ${esc(g.owner?.nickname || '-')}</p>
+        <h4>成员（${g.members.length}）</h4>
+        <table><thead><tr><th>昵称</th><th>手机/邮箱</th><th>角色</th><th>操作</th></tr></thead><tbody>
+        ${g.members.map(m => `<tr>
+          <td>${esc(m.user.nickname)}</td>
+          <td>${esc(m.user.phone || m.user.email || '-')}</td>
+          <td>${m.role === 'owner' ? '<span class="badge admin">群主</span>' : '成员'}</td>
+          <td>${m.role === 'owner' ? '<span class="muted">—</span>' : `<button class="sm danger" onclick="removeMember('${g.id}','${m.user.id}')">移除</button>`}</td>
+        </tr>`).join('')}
+        </tbody></table>
+        <h4 style="margin-top:16px">群内共享快递（${g.sharedParcels.length}）</h4>
+        <table><thead><tr><th>取件码</th><th>公司</th><th>共享人</th><th>状态</th></tr></thead><tbody>
+        ${g.sharedParcels.map(s => `<tr>
+          <td><b>${esc(s.parcel?.pickupCode || '-')}</b></td>
+          <td>${esc(s.parcel?.company || '-')}</td>
+          <td>${esc(s.sharedBy?.nickname || '-')}</td>
+          <td><span class="tag ${s.status}">${STATUS_LABEL[s.status] || s.status}</span></td>
+        </tr>`).join('') || '<tr><td colspan="4" class="muted">暂无共享</td></tr>'}
+        </tbody></table>`;
+      box.scrollIntoView({ behavior: 'smooth' });
+    }
+    async function removeMember(groupId, userId) {
+      if (!confirm('确定将该成员移出群组？')) return;
+      try { await api(`/admin/groups/${groupId}/members/${userId}`, { method: 'DELETE' }); toast('已移除'); viewGroup(groupId); } catch (e) { toast(e.message); }
+    }
+    async function delGroup(id, name) {
+      if (!confirm(`确定删除群组「${name}」？群成员、共享记录都会被删除。`)) return;
+      try { await api('/admin/groups/' + id, { method: 'DELETE' }); toast('已删除');
+        document.getElementById('groupDetail').classList.add('hidden'); loadGroups(1); } catch (e) { toast(e.message); }
+    }
+
+    // ===== 快递 =====
+    async function loadParcels(page = 1) {
+      const q = document.getElementById('parcelQ').value.trim();
+      const status = document.getElementById('parcelStatus').value;
+      const data = await api(`/admin/parcels?page=${page}&q=${encodeURIComponent(q)}&status=${status}`);
+      document.getElementById('parcelRows').innerHTML = data.parcels.map(p => `
+        <tr>
+          <td><b>${esc(p.pickupCode)}</b></td>
+          <td>${esc(p.company || '-')}</td>
+          <td>${esc(p.location || '-')}</td>
+          <td>
+            <select class="sm" onchange="changeStatus('${p.id}', this.value)">
+              ${['pending','picked','expired'].map(s => `<option value="${s}" ${p.status===s?'selected':''}>${STATUS_LABEL[s]}</option>`).join('')}
+            </select>
+          </td>
+          <td>${esc(p.user.nickname)}<br><small class="muted">${esc(p.user.phone || p.user.email || '')}</small></td>
+          <td><small>${fmt(p.createdAt)}</small></td>
+          <td><button class="sm danger" onclick="delParcel('${p.id}')">删除</button></td>
+        </tr>`).join('') || '<tr><td colspan="7" class="muted">无数据</td></tr>';
+      pager(document.getElementById('parcelPager'), data, 'loadParcels');
+    }
+    async function changeStatus(id, status) {
+      try { await api('/admin/parcels/' + id, { method: 'PATCH', body: JSON.stringify({ status }) }); toast('状态已更新'); } catch (e) { toast(e.message); }
+    }
+    async function delParcel(id) {
+      if (!confirm('确定删除这条快递？')) return;
+      try { await api('/admin/parcels/' + id, { method: 'DELETE' }); toast('已删除'); loadParcels(currentPage('parcelPager')); } catch (e) { toast(e.message); }
+    }
+
+    // 从分页器文本里取当前页（用于操作后原地刷新）
+    function currentPage(pagerId) {
+      const m = document.getElementById(pagerId).textContent.match(/第\s*(\d+)/);
+      return m ? Number(m[1]) : 1;
+    }
+
+    if (token) showDash();
+  </script>
+</body>
+</html>
