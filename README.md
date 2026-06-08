@@ -77,3 +77,11 @@ flutter run                   # 连真机/模拟器运行
 ## 五、已实现 & 后续步骤
 
 详见 [docs/ROADMAP.md](docs/ROADMAP.md)。
+
+---
+
+## 六、友情链接
+
+[![LINUX DO](https://img.shields.io/badge/LINUX%20DO-新的理想型社区-ffb003?style=for-the-badge)](https://linux.do)
+
+> [LINUX DO](https://linux.do) —— 新的理想型社区，欢迎来玩 👋
